@@ -31,7 +31,7 @@
 
 GitHub Actions workflows are written as YAML, but the thing they describe is a graph: jobs wait for other jobs, conditions change what can run, and one small `needs:` edit can reshape the whole pipeline. gha-preview makes that structure visible before a push.
 
-Open the [live playground](https://maximilianfeix.github.io/gha-preview/), edit the sample, or choose a `.yml`/`.yaml` file from your computer. The graph updates as you type. Select a job to inspect its condition, runner, steps, and source line.
+Open the [live playground](https://maximilianfeix.github.io/gha-preview/), edit the sample, or drop a `.yml`/`.yaml` file onto the editor. The graph updates as you type. Select a job to inspect its condition, runner, steps, and source line.
 
 ```text
 lint ──────┐
@@ -47,6 +47,7 @@ tests ─────┘
 - **Exports a clean SVG.** Save the current dependency map for a pull request, issue, or README.
 - **Shares a reproducible example.** Copy a URL with compressed YAML in the URL fragment. The workflow is not sent to the site server, but anyone with the link can read it.
 - **Keeps analysis local.** YAML parsing and rendering happen in the browser. There is no account, API key, analytics, or workflow upload.
+- **Gets out of your way.** Drop a workflow file into the editor or open it with the file picker; files over 1 MB are rejected before parsing.
 
 Workflow files and share links are limited to 1 MB. Remove secrets before copying a link; the URL is readable by anyone who receives it.
 
