@@ -5,6 +5,7 @@
 
 [![Checks](https://github.com/maximilianfeix/gha-preview/actions/workflows/ci.yml/badge.svg)](https://github.com/maximilianfeix/gha-preview/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/maximilianfeix/gha-preview/actions/workflows/codeql.yml/badge.svg)](https://github.com/maximilianfeix/gha-preview/actions/workflows/codeql.yml)
+[![Latest release](https://img.shields.io/github/v/release/maximilianfeix/gha-preview?display_name=tag&color=34784c)](https://github.com/maximilianfeix/gha-preview/releases/latest)
 [![GitHub Pages](https://img.shields.io/badge/demo-live-34784c?logo=githubpages&logoColor=white)](https://maximilianfeix.github.io/gha-preview/)
 [![GitHub stars](https://img.shields.io/github/stars/maximilianfeix/gha-preview?style=social)](https://github.com/maximilianfeix/gha-preview/stargazers)
 [![License: MIT](https://img.shields.io/badge/license-MIT-647568.svg)](LICENSE)
