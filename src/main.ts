@@ -1,4 +1,4 @@
-import { decodeWorkflow, encodeWorkflow, maxWorkflowBytes } from './share.ts';
+import { decodeWorkflow, encodeWorkflow } from './share.ts';
 import {
   layoutJobs,
   parseWorkflow,
@@ -7,6 +7,7 @@ import {
   type Workflow,
 } from './engine.ts';
 import './style.css';
+import { validateWorkflowFile } from './file.ts';
 
 const sample = `name: Release gate
 on: [pull_request, push]
@@ -118,6 +119,53 @@ let selectedJob: string | undefined;
 let selectedEvent = '';
 let activeFile = 'release.yml';
 let toastTimer = 0;
+const editorPane = root.querySelector<HTMLElement>('.editor-pane')!;
+let dragDepth = 0;
+
+async function loadWorkflowFile(file: File) {
+  const error = validateWorkflowFile(file.name, file.size);
+  if (error === 'extension') {
+    notify('Choose a .yml or .yaml workflow file.');
+    return;
+  }
+  if (error === 'size') {
+    notify('Choose a workflow smaller than 1 MB.');
+    return;
+  }
+  try {
+    input.value = await file.text();
+    activeFile = file.name;
+    root.querySelector('#filename')!.textContent = activeFile;
+    selectedJob = undefined;
+    update();
+  } catch {
+    notify('Could not read that workflow file.');
+  }
+}
+
+editorPane.addEventListener('dragenter', (event) => {
+  if (!event.dataTransfer?.types.includes('Files')) return;
+  event.preventDefault();
+  dragDepth += 1;
+  editorPane.classList.add('is-drop-target');
+});
+editorPane.addEventListener('dragover', (event) => {
+  if (!event.dataTransfer?.types.includes('Files')) return;
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+});
+editorPane.addEventListener('dragleave', (event) => {
+  if (!event.dataTransfer?.types.includes('Files')) return;
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (dragDepth === 0) editorPane.classList.remove('is-drop-target');
+});
+editorPane.addEventListener('drop', (event) => {
+  if (!event.dataTransfer?.files.length) return;
+  event.preventDefault();
+  dragDepth = 0;
+  editorPane.classList.remove('is-drop-target');
+  void loadWorkflowFile(event.dataTransfer.files[0]!);
+});
 
 function statusFor(id: string): ScenarioState {
   if (!selectedEvent || !parsed) return 'runs';
@@ -330,15 +378,8 @@ root
   .addEventListener('change', async (event) => {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;
-    if (file.size > maxWorkflowBytes) {
-      notify('Choose a workflow smaller than 1 MB.');
-      return;
-    }
-    input.value = await file.text();
-    activeFile = file.name;
-    root.querySelector('#filename')!.textContent = activeFile;
-    selectedJob = undefined;
-    update();
+    await loadWorkflowFile(file);
+    (event.target as HTMLInputElement).value = '';
   });
 root.querySelector('#share-button')!.addEventListener('click', async () => {
   let encoded: string;
