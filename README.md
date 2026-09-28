@@ -95,7 +95,7 @@ npm run build     # type-check and create dist/
 npm run check     # tests and production build
 ```
 
-GitHub Actions runs the test suite and production build on Node 20, 22, and 24, audits dependencies, runs CodeQL, and deploys the site to GitHub Pages from `main`. Releases are created from `v*.*.*` tags with generated notes.
+GitHub Actions runs the test suite and production build on Node 22 and 24, audits dependencies, runs CodeQL, and deploys the site to GitHub Pages from `main`. Development requires Node 22.12+, 24.x, or 26+. Releases are created from `v*.*.*` tags with generated notes.
 
 ## Contributing
 
