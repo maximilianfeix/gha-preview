@@ -903,6 +903,69 @@ p {
 .inspector-facts code {
   font: 8px var(--mono);
 }
+.inspector-matrix {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #e5ebe3;
+  border-radius: 7px;
+  background: #fff;
+}
+.matrix-title,
+.matrix-axes > span {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.matrix-title > span {
+  color: #929b92;
+  font: 8px var(--mono);
+  letter-spacing: 0.6px;
+}
+.matrix-title > strong {
+  color: #607361;
+  font: 9px var(--mono);
+}
+.matrix-axes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 14px;
+  margin-top: 8px;
+}
+.matrix-axes > span {
+  justify-content: flex-start;
+  color: #667266;
+  font-size: 9px;
+}
+.matrix-axes code,
+.matrix-variants code {
+  color: #426f4b;
+  font: 8px var(--mono);
+}
+.matrix-variants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+.matrix-variants > span {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: #f4f7f3;
+}
+.matrix-variants small,
+.inspector-matrix > p {
+  color: #7e887d;
+  font-size: 8px;
+}
+.inspector-matrix > p {
+  margin: 7px 0 0;
+  line-height: 1.5;
+}
 .inspector-steps > span {
   display: flex;
   align-items: center;

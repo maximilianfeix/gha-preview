@@ -217,8 +217,15 @@ function svgGraph(workflow: Workflow): string {
       const position = coords.get(job.id)!;
       const status = statusFor(job.id);
       const conditional = Boolean(job.condition);
+      const matrixLabel = job.strategy
+        ? job.strategy.dynamic
+          ? ' · matrix · dynamic'
+          : job.strategy.axes.length
+            ? ` · matrix ×${job.strategy.truncated ? '128+' : job.strategy.combinations.length}`
+            : ' · matrix · include only'
+        : '';
       const label = job.name.length > 22 ? `${job.name.slice(0, 20)}…` : job.name;
-      return `<g class="job-node state-${status} ${conditional ? 'has-condition' : ''} ${selectedJob === job.id ? 'is-selected' : ''}" transform="translate(${position.x} ${position.y})" data-job="${escapeHtml(job.id)}" tabindex="0" role="button" aria-label="${escapeHtml(job.name)}, ${stateLabel[status]}, line ${job.line}"><rect class="node-shell" x="0" y="0" width="176" height="96" rx="12"/><rect class="node-top-line" x="1" y="1" width="174" height="3" rx="2"/><circle class="node-state" cx="19" cy="23" r="5"/><text class="node-label" x="34" y="27">${escapeHtml(label)}</text><text class="node-id" x="16" y="52">${escapeHtml(job.id)}${job.strategy ? ' · matrix' : ''}</text><line class="node-divider" x1="16" y1="64" x2="160" y2="64"/><text class="node-meta" x="16" y="82">${job.needs.length ? `${job.needs.length} ${job.needs.length === 1 ? 'dependency' : 'dependencies'}` : 'entry point'}</text><text class="node-status" x="160" y="82" text-anchor="end">${stateSymbol[status]} ${stateLabel[status]}</text><title>${escapeHtml(job.name)} · line ${job.line}${job.condition ? ` · if: ${escapeHtml(job.condition)}` : ''}</title></g>`;
+      return `<g class="job-node state-${status} ${conditional ? 'has-condition' : ''} ${selectedJob === job.id ? 'is-selected' : ''}" transform="translate(${position.x} ${position.y})" data-job="${escapeHtml(job.id)}" tabindex="0" role="button" aria-label="${escapeHtml(job.name)}, ${stateLabel[status]}${matrixLabel}, line ${job.line}"><rect class="node-shell" x="0" y="0" width="176" height="96" rx="12"/><rect class="node-top-line" x="1" y="1" width="174" height="3" rx="2"/><circle class="node-state" cx="19" cy="23" r="5"/><text class="node-label" x="34" y="27">${escapeHtml(label)}</text><text class="node-id" x="16" y="52">${escapeHtml(job.id)}${matrixLabel}</text><line class="node-divider" x1="16" y1="64" x2="160" y2="64"/><text class="node-meta" x="16" y="82">${job.needs.length ? `${job.needs.length} ${job.needs.length === 1 ? 'dependency' : 'dependencies'}` : 'entry point'}</text><text class="node-status" x="160" y="82" text-anchor="end">${stateSymbol[status]} ${stateLabel[status]}</text><title>${escapeHtml(job.name)} · line ${job.line}${job.condition ? ` · if: ${escapeHtml(job.condition)}` : ''}${matrixLabel}</title></g>`;
     })
     .join('');
   return `<svg class="workflow-svg" xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" aria-label="Workflow job dependency graph"><defs><marker id="edge-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#aeb8ae"/></marker></defs>${lines}${nodes}</svg>`;
@@ -231,7 +238,38 @@ function renderInspector(jobId: string) {
     return;
   }
   inspector.hidden = false;
-  inspector.innerHTML = `<div class="inspector-main"><span class="inspector-glyph">${icon('code')}</span><div><span class="inspector-label">JOB DETAILS <button class="inline-source" data-line="${job.line}">line ${job.line}</button></span><h3>${escapeHtml(job.name)}</h3><code>${escapeHtml(job.id)}</code></div></div><div class="inspector-facts"><div><span>DEPENDS ON</span><p>${job.needs.length ? job.needs.map(escapeHtml).join(', ') : 'Nothing — starts first'}</p></div><div><span>CONDITION</span><p>${job.condition ? `<code>${escapeHtml(job.condition)}</code>` : 'Runs when its dependencies pass'}</p></div><div><span>RUNS ON</span><p>${escapeHtml(job.runsOn ?? 'Not specified')}</p></div></div><div class="inspector-steps"><span>STEPS <b>${job.steps.length}</b></span>${
+  const matrix = job.strategy;
+  const matrixCount = matrix
+    ? matrix.dynamic
+      ? 'dynamic axis values'
+      : matrix.axes.length
+        ? `${matrix.truncated ? '128+' : matrix.combinations.length} combinations`
+        : matrix.include
+          ? 'include-only matrix'
+          : 'matrix values need context'
+    : '';
+  const matrixAxisDescription = matrix?.axes.length
+    ? matrix.axes
+        .map(
+          (axis) =>
+            `<span><code>${escapeHtml(axis.name)}</code><span>${axis.values.map(escapeHtml).join(' · ')}</span></span>`,
+        )
+        .join('')
+    : matrix?.include
+      ? '<span>Combination values come from include entries.</span>'
+      : '<span>No static matrix axis values to preview.</span>';
+  const matrixPanel = matrix
+    ? `<div class="inspector-matrix"><div class="matrix-title"><span>MATRIX PREVIEW</span><strong>${matrixCount}</strong></div><div class="matrix-axes">${matrixAxisDescription}</div><div class="matrix-variants">${matrix.combinations
+        .slice(0, 12)
+        .map(
+          (combination) =>
+            `<span>${matrix.axes.map((axis) => `<code>${escapeHtml(axis.name)}=${escapeHtml(combination[axis.name] ?? '')}</code>`).join(' ')}</span>`,
+        )
+        .join(
+          '',
+        )}${matrix.combinations.length > 12 ? `<small>and ${matrix.combinations.length - 12} more</small>` : ''}</div><p>${matrix.dynamic ? 'Expressions stay unresolved; values shown literally. ' : ''}${matrix.exclude ? 'Exclude entries are applied to the base preview. ' : ''}${matrix.include ? 'Include entries can add or modify variants and are not expanded here. ' : ''}${matrix.truncated ? 'The preview is capped at 128 candidates.' : 'This previews matrix values; it does not schedule runner jobs.'}</p></div>`
+    : '';
+  inspector.innerHTML = `<div class="inspector-main"><span class="inspector-glyph">${icon('code')}</span><div><span class="inspector-label">JOB DETAILS <button class="inline-source" data-line="${job.line}">line ${job.line}</button></span><h3>${escapeHtml(job.name)}</h3><code>${escapeHtml(job.id)}</code></div></div><div class="inspector-facts"><div><span>DEPENDS ON</span><p>${job.needs.length ? job.needs.map(escapeHtml).join(', ') : 'Nothing — starts first'}</p></div><div><span>CONDITION</span><p>${job.condition ? `<code>${escapeHtml(job.condition)}</code>` : 'Runs when its dependencies pass'}</p></div><div><span>RUNS ON</span><p>${escapeHtml(job.runsOn ?? 'Not specified')}</p></div></div>${matrixPanel}<div class="inspector-steps"><span>STEPS <b>${job.steps.length}</b></span>${
     job.steps
       .slice(0, 4)
       .map(
