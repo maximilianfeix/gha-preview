@@ -5,5 +5,6 @@ export function validateWorkflowFile(
   size: number,
 ): WorkflowFileError | undefined {
   if (!/\.ya?ml$/i.test(name)) return 'extension';
-  if (size > 1024 * 1024) return 'size';
+  if (size > maxWorkflowBytes) return 'size';
 }
+import { maxWorkflowBytes } from './share.ts';
