@@ -12,6 +12,8 @@ export type Step = { name: string; line: number; uses?: string; run?: string };
 export type MatrixInfo = {
   axes: { name: string; values: string[] }[];
   combinations: Record<string, string>[];
+  includeValues: Record<string, string>[];
+  excludeValues: Record<string, string>[];
   baseCount: number;
   truncated: boolean;
   dynamic: boolean;
@@ -66,8 +68,8 @@ export function diffJobs(base: Workflow, current: Workflow): Map<string, JobChan
               axes: [...job.strategy.axes]
                 .sort((a, b) => a.name.localeCompare(b.name))
                 .map((axis) => ({ name: axis.name, values: axis.values })),
-              include: job.strategy.include,
-              exclude: job.strategy.exclude,
+              includeValues: job.strategy.includeValues,
+              excludeValues: job.strategy.excludeValues,
             }
           : undefined,
         permissions: job.permissions,
@@ -110,6 +112,19 @@ function readEvents(node: Node | null | undefined): string[] {
   return value ? [value] : [];
 }
 
+function readMatrixRows(node: Node | undefined): Record<string, string>[] {
+  if (!isSeq(node)) return [];
+  return node.items.flatMap((item) => {
+    const object = asObject(item as Node);
+    if (!object) return [];
+    const entries = [...object].flatMap(([key, value]) => {
+      const itemValue = scalar(value);
+      return itemValue === undefined ? [] : [[String(key), itemValue]];
+    });
+    return entries.length ? [Object.fromEntries(entries)] : [];
+  });
+}
+
 function readMatrix(strategyNode: Node | null | undefined): MatrixInfo | undefined {
   const strategy = asObject(strategyNode);
   const matrixNode = strategy?.get('matrix');
@@ -144,18 +159,8 @@ function readMatrix(strategyNode: Node | null | undefined): MatrixInfo | undefin
     combinations = next.slice(0, 128);
   }
 
-  const exclusions = isSeq(matrix.get('exclude'))
-    ? (matrix.get('exclude') as Node & { items: Node[] }).items.flatMap((item) => {
-        const object = asObject(item);
-        if (!object) return [];
-        const entries = [...object].flatMap(([key, value]) => {
-          const itemValue = scalar(value);
-          return itemValue === undefined ? [] : [[String(key), itemValue]];
-        });
-        if (!entries.length) return [];
-        return [Object.fromEntries(entries)];
-      })
-    : [];
+  const exclusions = readMatrixRows(matrix.get('exclude'));
+  const inclusions = readMatrixRows(includeNode);
   combinations = combinations.filter(
     (combination) =>
       !exclusions.some((excluded) =>
@@ -166,10 +171,12 @@ function readMatrix(strategyNode: Node | null | undefined): MatrixInfo | undefin
   return {
     axes,
     combinations,
+    includeValues: inclusions,
+    excludeValues: exclusions,
     baseCount,
     truncated,
     dynamic: axes.some((axis) => axis.values.some((value) => value.includes('${{'))),
-    include: isSeq(includeNode) && includeNode.items.length > 0,
+    include: inclusions.length > 0,
     exclude: exclusions.length > 0,
   };
 }

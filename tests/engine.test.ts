@@ -163,6 +163,30 @@ jobs:
     );
     expect(diffJobs(base, current).get('build')).toBe('unchanged');
   });
+
+  it('detects matrix include and exclude changes even when counts match', () => {
+    const base = parseWorkflow(`on: push
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        exclude:
+          - os: windows-latest
+`);
+    const current = parseWorkflow(`on: push
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        exclude:
+          - os: ubuntu-latest
+        include:
+          - os: macos-latest
+`);
+    expect(diffJobs(base, current).get('test')).toBe('changed');
+  });
 });
 
 describe('simulate', () => {
