@@ -12,6 +12,8 @@ export type Step = { name: string; line: number; uses?: string; run?: string };
 export type MatrixInfo = {
   axes: { name: string; values: string[] }[];
   combinations: Record<string, string>[];
+  includeValues: Record<string, string>[];
+  excludeValues: Record<string, string>[];
   baseCount: number;
   truncated: boolean;
   dynamic: boolean;
@@ -29,6 +31,7 @@ export type Job = {
   strategy?: MatrixInfo;
   permissions?: string;
 };
+export type JobChange = 'added' | 'removed' | 'changed' | 'unchanged';
 export type Workflow = {
   name: string;
   events: string[];
@@ -37,6 +40,45 @@ export type Workflow = {
   diagnostics: Diagnostic[];
   raw: string;
 };
+
+export function diffJobs(base: Workflow, current: Workflow): Map<string, JobChange> {
+  const baseJobs = new Map(base.jobs.map((job) => [job.id, job]));
+  const currentJobs = new Map(current.jobs.map((job) => [job.id, job]));
+  const ids = new Set([...baseJobs.keys(), ...currentJobs.keys()]);
+  const changes = new Map<string, JobChange>();
+  for (const id of ids) {
+    const before = baseJobs.get(id);
+    const after = currentJobs.get(id);
+    if (!before) {
+      changes.set(id, 'added');
+      continue;
+    }
+    if (!after) {
+      changes.set(id, 'removed');
+      continue;
+    }
+    const snapshot = (job: Job) =>
+      JSON.stringify({
+        name: job.name,
+        needs: [...job.needs].sort(),
+        condition: job.condition,
+        runsOn: job.runsOn,
+        strategy: job.strategy
+          ? {
+              axes: [...job.strategy.axes]
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((axis) => ({ name: axis.name, values: axis.values })),
+              includeValues: job.strategy.includeValues,
+              excludeValues: job.strategy.excludeValues,
+            }
+          : undefined,
+        permissions: job.permissions,
+        steps: job.steps.map(({ name, uses, run }) => ({ name, uses, run })),
+      });
+    changes.set(id, snapshot(before) === snapshot(after) ? 'unchanged' : 'changed');
+  }
+  return changes;
+}
 
 const asObject = (node: Node | null | undefined): Map<unknown, Node> | undefined =>
   isMap(node)
@@ -68,6 +110,19 @@ function readEvents(node: Node | null | undefined): string[] {
       .filter((value): value is string => Boolean(value));
   const value = scalar(node);
   return value ? [value] : [];
+}
+
+function readMatrixRows(node: Node | undefined): Record<string, string>[] {
+  if (!isSeq(node)) return [];
+  return node.items.flatMap((item) => {
+    const object = asObject(item as Node);
+    if (!object) return [];
+    const entries = [...object].flatMap(([key, value]) => {
+      const itemValue = scalar(value);
+      return itemValue === undefined ? [] : [[String(key), itemValue]];
+    });
+    return entries.length ? [Object.fromEntries(entries)] : [];
+  });
 }
 
 function readMatrix(strategyNode: Node | null | undefined): MatrixInfo | undefined {
@@ -104,18 +159,8 @@ function readMatrix(strategyNode: Node | null | undefined): MatrixInfo | undefin
     combinations = next.slice(0, 128);
   }
 
-  const exclusions = isSeq(matrix.get('exclude'))
-    ? (matrix.get('exclude') as Node & { items: Node[] }).items.flatMap((item) => {
-        const object = asObject(item);
-        if (!object) return [];
-        const entries = [...object].flatMap(([key, value]) => {
-          const itemValue = scalar(value);
-          return itemValue === undefined ? [] : [[String(key), itemValue]];
-        });
-        if (!entries.length) return [];
-        return [Object.fromEntries(entries)];
-      })
-    : [];
+  const exclusions = readMatrixRows(matrix.get('exclude'));
+  const inclusions = readMatrixRows(includeNode);
   combinations = combinations.filter(
     (combination) =>
       !exclusions.some((excluded) =>
@@ -126,10 +171,12 @@ function readMatrix(strategyNode: Node | null | undefined): MatrixInfo | undefin
   return {
     axes,
     combinations,
+    includeValues: inclusions,
+    excludeValues: exclusions,
     baseCount,
     truncated,
     dynamic: axes.some((axis) => axis.values.some((value) => value.includes('${{'))),
-    include: isSeq(includeNode) && includeNode.items.length > 0,
+    include: inclusions.length > 0,
     exclude: exclusions.length > 0,
   };
 }

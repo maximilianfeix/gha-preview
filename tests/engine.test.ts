@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { layoutJobs, parseWorkflow, simulate } from '../src/engine.ts';
+import { diffJobs, layoutJobs, parseWorkflow, simulate } from '../src/engine.ts';
 import { decodeWorkflow, encodeWorkflow } from '../src/share.ts';
 
 const workflow = `name: CI
@@ -112,6 +112,80 @@ jobs:
     expect(parsed.eventFilters).toEqual(['push']);
     expect(simulate(parsed, 'push').get('build')).toBe('unknown');
     expect(simulate(parsed, 'workflow_dispatch').get('build')).toBe('runs');
+  });
+});
+
+describe('diffJobs', () => {
+  it('distinguishes added, removed, changed and unchanged graph jobs', () => {
+    const base = parseWorkflow(`on: push
+jobs:
+  keep:
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm test
+  change:
+    needs: keep
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm build
+  remove:
+    runs-on: ubuntu-latest
+`);
+    const current = parseWorkflow(`on: push
+jobs:
+  keep:
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm test
+  change:
+    needs: [keep, new]
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm build
+  new:
+    needs: keep
+    runs-on: ubuntu-latest
+`);
+    expect(diffJobs(base, current)).toEqual(
+      new Map([
+        ['keep', 'unchanged'],
+        ['change', 'changed'],
+        ['remove', 'removed'],
+        ['new', 'added'],
+      ]),
+    );
+  });
+
+  it('ignores source line shifts while comparing workflow graph details', () => {
+    const base = parseWorkflow('on: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n');
+    const current = parseWorkflow(
+      'on: push\n\n# inserted comment\njobs:\n  build:\n    runs-on: ubuntu-latest\n',
+    );
+    expect(diffJobs(base, current).get('build')).toBe('unchanged');
+  });
+
+  it('detects matrix include and exclude changes even when counts match', () => {
+    const base = parseWorkflow(`on: push
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        exclude:
+          - os: windows-latest
+`);
+    const current = parseWorkflow(`on: push
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        exclude:
+          - os: ubuntu-latest
+        include:
+          - os: macos-latest
+`);
+    expect(diffJobs(base, current).get('test')).toBe('changed');
   });
 });
 
