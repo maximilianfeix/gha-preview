@@ -29,6 +29,7 @@ export type Job = {
   strategy?: MatrixInfo;
   permissions?: string;
 };
+export type JobChange = 'added' | 'removed' | 'changed' | 'unchanged';
 export type Workflow = {
   name: string;
   events: string[];
@@ -37,6 +38,45 @@ export type Workflow = {
   diagnostics: Diagnostic[];
   raw: string;
 };
+
+export function diffJobs(base: Workflow, current: Workflow): Map<string, JobChange> {
+  const baseJobs = new Map(base.jobs.map((job) => [job.id, job]));
+  const currentJobs = new Map(current.jobs.map((job) => [job.id, job]));
+  const ids = new Set([...baseJobs.keys(), ...currentJobs.keys()]);
+  const changes = new Map<string, JobChange>();
+  for (const id of ids) {
+    const before = baseJobs.get(id);
+    const after = currentJobs.get(id);
+    if (!before) {
+      changes.set(id, 'added');
+      continue;
+    }
+    if (!after) {
+      changes.set(id, 'removed');
+      continue;
+    }
+    const snapshot = (job: Job) =>
+      JSON.stringify({
+        name: job.name,
+        needs: [...job.needs].sort(),
+        condition: job.condition,
+        runsOn: job.runsOn,
+        strategy: job.strategy
+          ? {
+              axes: [...job.strategy.axes]
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((axis) => ({ name: axis.name, values: axis.values })),
+              include: job.strategy.include,
+              exclude: job.strategy.exclude,
+            }
+          : undefined,
+        permissions: job.permissions,
+        steps: job.steps.map(({ name, uses, run }) => ({ name, uses, run })),
+      });
+    changes.set(id, snapshot(before) === snapshot(after) ? 'unchanged' : 'changed');
+  }
+  return changes;
+}
 
 const asObject = (node: Node | null | undefined): Map<unknown, Node> | undefined =>
   isMap(node)

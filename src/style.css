@@ -340,6 +340,52 @@ p {
   align-items: center;
   justify-content: space-between;
 }
+.compare-bar {
+  min-height: 38px;
+  padding: 5px 12px;
+  border-bottom: 1px solid #e9ece8;
+  background: #f7f9f6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #677468;
+  font-size: 9px;
+}
+.compare-bar[hidden] {
+  display: none;
+}
+.compare-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.compare-version,
+.compare-clear {
+  min-height: 25px;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: #687468;
+  font-size: 9px;
+  cursor: pointer;
+}
+.compare-version[aria-pressed='true'] {
+  border-color: #c8d9c7;
+  background: #edf5ed;
+  color: #3c7548;
+}
+.compare-clear {
+  width: 25px;
+  padding: 0;
+  font-size: 16px;
+}
+.compare-version:focus-visible,
+.compare-clear:focus-visible {
+  outline: 2px solid #438154;
+  outline-offset: 2px;
+}
 .bar-file,
 .bar-actions,
 .file-button,
@@ -621,6 +667,54 @@ p {
 }
 .job-node {
   cursor: pointer;
+}
+.job-node.diff-added .node-shell {
+  stroke: #54a06a;
+  stroke-width: 2;
+}
+.job-node.diff-changed .node-shell {
+  stroke: #d2a34d;
+  stroke-width: 2;
+}
+.job-node.diff-removed .node-shell {
+  stroke: #cb765f;
+  stroke-width: 2;
+  stroke-dasharray: 5 3;
+}
+.job-node.diff-added .node-top-line {
+  fill: #54a06a;
+}
+.job-node.diff-changed .node-top-line {
+  fill: #d2a34d;
+}
+.job-node.diff-removed .node-top-line {
+  fill: #cb765f;
+}
+.job-node.diff-removed .node-state {
+  fill: #cb765f;
+}
+.diff-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #758075;
+  font-size: 8px;
+}
+.diff-legend[hidden] {
+  display: none;
+}
+.diff-dot {
+  width: 6px;
+  height: 6px;
+  margin-left: 3px;
+  border-radius: 50%;
+  background: #54a06a;
+}
+.diff-dot.changed {
+  background: #d2a34d;
+}
+.diff-dot.removed {
+  background: #cb765f;
 }
 .node-shell {
   fill: #fff;
@@ -1698,6 +1792,11 @@ p {
   .site-footer > a:last-child {
     font-size: 8px;
   }
+}
+.editor-wrap textarea[readonly] {
+  background: #f8faf7;
+  color: #687468;
+  cursor: default;
 }
 @media (prefers-reduced-motion: reduce) {
   *,

@@ -22,6 +22,12 @@
 
 ![gha-preview showing workflow YAML alongside a clickable job graph](docs/assets/playground.png)
 
+### Review a workflow change
+
+Open [`shop-ci-v2.yml`](examples/shop-ci-v2.yml), choose **Compare**, then select [`shop-ci-v1.yml`](examples/shop-ci-v1.yml). Added and changed jobs stand out in the proposed map; switch to **Base** to inspect removed jobs and their original lines. Both files stay in your browser.
+
+![Workflow comparison with added, changed, and removed jobs highlighted](docs/assets/workflow-diff.png)
+
 ### Try it in 20 seconds
 
 1. [Open the live preview](https://maximilianfeix.github.io/gha-preview/).
@@ -47,6 +53,7 @@ tests ─────┘
 - **Previews common events.** Select a declared trigger to see which jobs are eligible, skipped by a simple event condition, or need runtime context.
 - **Opens matrix jobs.** Inspect axis values and up to 128 combinations, with simple `exclude` entries applied. Dynamic expressions stay literal; `include` overlays are called out instead of guessed.
 - **Links the map to the source.** Select a job, step, or diagnostic to jump to its YAML line.
+- **Reviews a proposed change.** Compare a base and proposed workflow locally. Added, removed, and graph-relevant job changes are highlighted, with a read-only toggle for the base file.
 - **Exports a clean SVG.** Save the current dependency map for a pull request, issue, or README.
 - **Shares a reproducible example.** Copy a URL with compressed YAML in the URL fragment. The workflow is not sent to the site server, but anyone with the link can read it.
 - **Keeps analysis local.** YAML parsing and rendering happen in the browser. There is no account, API key, analytics, or workflow upload.
@@ -111,8 +118,8 @@ Bug reports and focused pull requests are welcome. Please redact secrets from sa
 - [x] Conservative preview for common workflow events
 - [x] Zoom and pan large workflow graphs
 - [x] Preview matrix combinations and exclusions
+- [x] Compare workflow revisions before a push ([#9](https://github.com/maximilianfeix/gha-preview/issues/9))
 - [ ] More expression helpers, with explicit unknown states for runtime-only values
-- [ ] Visual diff between two workflow revisions
 
 Ideas are tracked in [GitHub Issues](https://github.com/maximilianfeix/gha-preview/issues). Tell us which workflow shape you need to understand.
 

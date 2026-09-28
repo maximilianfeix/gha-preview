@@ -1,8 +1,10 @@
 import { decodeWorkflow, encodeWorkflow } from './share.ts';
 import {
   layoutJobs,
+  diffJobs,
   parseWorkflow,
   simulate,
+  type JobChange,
   type ScenarioState,
   type Workflow,
 } from './engine.ts';
@@ -108,9 +110,10 @@ root.innerHTML = `
     <section id="playground" class="workspace-section">
       <div class="section-heading"><div><span class="section-kicker">THE PLAYGROUND</span><h2>Make the workflow make sense.</h2></div><p>Drop in a workflow file, then click any job to find its place in the YAML.</p></div>
       <div class="workbench">
-        <div class="workbench-bar"><div class="bar-file"><span class="file-icon">Y</span><span id="filename">release.yml</span><span class="bar-path">.github / workflows</span></div><div class="bar-actions"><label class="file-button" for="file-input">${icon('upload')}<span>Open file</span></label><input id="file-input" type="file" accept=".yml,.yaml,text/yaml" hidden/><button id="share-button" class="icon-button" title="Copy a link to this workflow">${icon('share')}<span class="mobile-hide"> Share</span></button><button id="export-button" class="icon-button" title="Download the job graph as SVG">${icon('download')}<span class="mobile-hide"> SVG</span></button></div></div>
-        <div class="workbench-body"><section class="editor-pane" aria-label="Workflow editor"><div class="pane-heading"><div><span class="pane-dot"></span> workflow.yml</div><span class="pane-hint">EDIT TO PREVIEW</span></div><div class="editor-wrap"><div id="line-numbers" class="line-numbers" aria-hidden="true"></div><textarea id="yaml-input" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="GitHub Actions workflow YAML" wrap="off"></textarea></div><div id="editor-message" class="editor-message"><span class="privacy-icon">●</span> Parsed locally. Nothing is uploaded.</div></section>
-          <section class="graph-pane" aria-label="Interactive workflow graph"><div class="pane-heading graph-heading"><div><span class="graph-heading-mark">${icon('code')}</span> Job map <span id="job-count" class="count-pill">—</span></div><div class="graph-controls" aria-label="Graph view controls"><button id="zoom-out" class="zoom-button" aria-label="Zoom out" title="Zoom out">−</button><output id="zoom-level" class="zoom-level" aria-live="polite">100%</output><button id="zoom-in" class="zoom-button" aria-label="Zoom in" title="Zoom in">+</button><button id="fit-button" class="quiet-button" title="Reset zoom and center the graph">Reset</button></div></div><div id="graph-scroll" class="graph-scroll"><div id="graph" class="graph-canvas"></div></div><div class="graph-footer"><span><i class="legend-dot success"></i>Eligible</span><span><i class="legend-dot conditional"></i>Conditional</span><span><i class="legend-dot unknown"></i>Unknown</span><span class="graph-hint">Scroll to pan · Ctrl + wheel to zoom</span></div></section>
+        <div class="workbench-bar"><div class="bar-file"><span class="file-icon">Y</span><span id="filename">release.yml</span><span class="bar-path">.github / workflows</span></div><div class="bar-actions"><label class="file-button" for="file-input">${icon('upload')}<span>Open file</span></label><input id="file-input" type="file" accept=".yml,.yaml,text/yaml" hidden/><label class="file-button compare-file-button" for="compare-input" title="Compare with a workflow file" aria-label="Compare workflows">${icon('code')}<span class="mobile-hide">Compare</span></label><input id="compare-input" type="file" accept=".yml,.yaml,text/yaml" hidden/><button id="share-button" class="icon-button" title="Copy a link to this workflow">${icon('share')}<span class="mobile-hide"> Share</span></button><button id="export-button" class="icon-button" title="Download the job graph as SVG">${icon('download')}<span class="mobile-hide"> SVG</span></button></div></div>
+        <div id="compare-bar" class="compare-bar" hidden><span id="compare-summary"></span><div class="compare-actions"><button id="show-base" class="compare-version">Base</button><button id="show-current" class="compare-version">Proposed</button><button id="clear-compare" class="compare-clear" aria-label="Clear workflow comparison">×</button></div></div>
+        <div class="workbench-body"><section class="editor-pane" aria-label="Workflow editor"><div class="pane-heading"><div><span class="pane-dot"></span><span id="editor-version">PROPOSED WORKFLOW</span></div><span class="pane-hint">EDIT TO PREVIEW</span></div><div class="editor-wrap"><div id="line-numbers" class="line-numbers" aria-hidden="true"></div><textarea id="yaml-input" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="GitHub Actions workflow YAML" wrap="off"></textarea></div><div id="editor-message" class="editor-message"><span class="privacy-icon">●</span> Parsed locally. Nothing is uploaded.</div></section>
+          <section class="graph-pane" aria-label="Interactive workflow graph"><div class="pane-heading graph-heading"><div><span class="graph-heading-mark">${icon('code')}</span> Job map <span id="job-count" class="count-pill">—</span></div><div class="graph-controls" aria-label="Graph view controls"><button id="zoom-out" class="zoom-button" aria-label="Zoom out" title="Zoom out">−</button><output id="zoom-level" class="zoom-level" aria-live="polite">100%</output><button id="zoom-in" class="zoom-button" aria-label="Zoom in" title="Zoom in">+</button><button id="fit-button" class="quiet-button" title="Reset zoom and center the graph">Reset</button></div></div><div id="graph-scroll" class="graph-scroll"><div id="graph" class="graph-canvas"></div></div><div class="graph-footer"><span><i class="legend-dot success"></i>Eligible</span><span><i class="legend-dot conditional"></i>Conditional</span><span><i class="legend-dot unknown"></i>Unknown</span><span id="diff-legend" class="diff-legend" hidden><i class="diff-dot added"></i>Added <i class="diff-dot changed"></i>Changed <i class="diff-dot removed"></i>Removed</span><span class="graph-hint">Scroll to pan · Ctrl + wheel to zoom</span></div></section>
         </div>
         <div class="scenario-bar"><div class="scenario-intro">${icon('play')}<span><strong>Try a scenario</strong><small>See what this event would start</small></span></div><div id="event-picker" class="event-picker"></div><span class="scenario-caveat">Event filters need context</span><button id="reset-scenario" class="reset-button">Reset</button></div>
         <div id="inspector" class="inspector" hidden></div>
@@ -134,14 +137,22 @@ const toast = root.querySelector<HTMLDivElement>('#toast')!;
 const graphViewport = root.querySelector<HTMLDivElement>('#graph-scroll')!;
 let graphZoom = 1;
 let parsed: Workflow;
+type WorkflowVersion = 'base' | 'proposed';
+let proposedText = '';
+let proposedFile = 'release.yml';
+let baseText = '';
+let baseFile = '';
+let baseWorkflow: Workflow | undefined;
+let activeVersion: WorkflowVersion = 'proposed';
+let jobChanges = new Map<string, JobChange>();
 let selectedJob: string | undefined;
 let selectedEvent = '';
-let activeFile = 'release.yml';
+let activeFile = proposedFile;
 let toastTimer = 0;
 const editorPane = root.querySelector<HTMLElement>('.editor-pane')!;
 let dragDepth = 0;
 
-async function loadWorkflowFile(file: File) {
+async function loadWorkflowFile(file: File, target: WorkflowVersion = 'proposed') {
   const error = validateWorkflowFile(file.name, file.size);
   if (error === 'extension') {
     notify('Choose a .yml or .yaml workflow file.');
@@ -152,8 +163,23 @@ async function loadWorkflowFile(file: File) {
     return;
   }
   try {
-    input.value = await file.text();
-    activeFile = file.name;
+    const text = await file.text();
+    if (target === 'base') {
+      baseText = text;
+      baseFile = file.name;
+      baseWorkflow = parseWorkflow(text);
+      activeVersion = 'proposed';
+      input.readOnly = false;
+      input.value = proposedText;
+      activeFile = proposedFile;
+    } else {
+      proposedText = text;
+      proposedFile = file.name;
+      activeVersion = 'proposed';
+      input.readOnly = false;
+      input.value = proposedText;
+      activeFile = proposedFile;
+    }
     root.querySelector('#filename')!.textContent = activeFile;
     selectedJob = undefined;
     update();
@@ -234,6 +260,15 @@ function svgGraph(workflow: Workflow): string {
       const position = coords.get(job.id)!;
       const status = statusFor(job.id);
       const conditional = Boolean(job.condition);
+      const change = jobChanges.get(job.id);
+      const visibleChange =
+        change === 'changed' ||
+        (activeVersion === 'proposed' && change === 'added') ||
+        (activeVersion === 'base' && change === 'removed')
+          ? change
+          : undefined;
+      const changeClass = visibleChange ? ` diff-${visibleChange}` : '';
+      const changeLabel = visibleChange ? `, ${visibleChange} in comparison` : '';
       const matrixLabel = job.strategy
         ? job.strategy.dynamic
           ? ' · matrix · dynamic'
@@ -242,7 +277,7 @@ function svgGraph(workflow: Workflow): string {
             : ' · matrix · include only'
         : '';
       const label = job.name.length > 22 ? `${job.name.slice(0, 20)}…` : job.name;
-      return `<g class="job-node state-${status} ${conditional ? 'has-condition' : ''} ${selectedJob === job.id ? 'is-selected' : ''}" transform="translate(${position.x} ${position.y})" data-job="${escapeHtml(job.id)}" tabindex="0" role="button" aria-label="${escapeHtml(job.name)}, ${stateLabel[status]}${matrixLabel}, line ${job.line}"><rect class="node-shell" x="0" y="0" width="176" height="96" rx="12"/><rect class="node-top-line" x="1" y="1" width="174" height="3" rx="2"/><circle class="node-state" cx="19" cy="23" r="5"/><text class="node-label" x="34" y="27">${escapeHtml(label)}</text><text class="node-id" x="16" y="52">${escapeHtml(job.id)}${matrixLabel}</text><line class="node-divider" x1="16" y1="64" x2="160" y2="64"/><text class="node-meta" x="16" y="82">${job.needs.length ? `${job.needs.length} ${job.needs.length === 1 ? 'dependency' : 'dependencies'}` : 'entry point'}</text><text class="node-status" x="160" y="82" text-anchor="end">${stateSymbol[status]} ${stateLabel[status]}</text><title>${escapeHtml(job.name)} · line ${job.line}${job.condition ? ` · if: ${escapeHtml(job.condition)}` : ''}${matrixLabel}</title></g>`;
+      return `<g class="job-node state-${status}${changeClass} ${conditional ? 'has-condition' : ''} ${selectedJob === job.id ? 'is-selected' : ''}" transform="translate(${position.x} ${position.y})" data-job="${escapeHtml(job.id)}" tabindex="0" role="button" aria-label="${escapeHtml(job.name)}, ${stateLabel[status]}${changeLabel}${matrixLabel}, line ${job.line}"><rect class="node-shell" x="0" y="0" width="176" height="96" rx="12"/><rect class="node-top-line" x="1" y="1" width="174" height="3" rx="2"/><circle class="node-state" cx="19" cy="23" r="5"/><text class="node-label" x="34" y="27">${escapeHtml(label)}</text><text class="node-id" x="16" y="52">${escapeHtml(job.id)}${matrixLabel}</text><line class="node-divider" x1="16" y1="64" x2="160" y2="64"/><text class="node-meta" x="16" y="82">${job.needs.length ? `${job.needs.length} ${job.needs.length === 1 ? 'dependency' : 'dependencies'}` : 'entry point'}</text><text class="node-status" x="160" y="82" text-anchor="end">${stateSymbol[status]} ${stateLabel[status]}</text><title>${escapeHtml(job.name)} · line ${job.line}${job.condition ? ` · if: ${escapeHtml(job.condition)}` : ''}${changeLabel}${matrixLabel}</title></g>`;
     })
     .join('');
   return `<svg class="workflow-svg" xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" aria-label="Workflow job dependency graph"><defs><marker id="edge-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#aeb8ae"/></marker></defs>${lines}${nodes}</svg>`;
@@ -401,7 +436,12 @@ function renderDiagnostics() {
 }
 
 function update() {
+  if (activeVersion === 'proposed') proposedText = input.value;
   parsed = parseWorkflow(input.value);
+  jobChanges = baseWorkflow
+    ? diffJobs(baseWorkflow, parseWorkflow(proposedText))
+    : new Map();
+  renderComparison();
   const lines = input.value.split('\n').length;
   lineNumbers.innerHTML = Array.from(
     { length: lines },
@@ -411,11 +451,46 @@ function update() {
     parsed.diagnostics.some((item) => item.level === 'error')
       ? `<span class="privacy-icon error-dot">●</span> ${escapeHtml(parsed.diagnostics.find((item) => item.level === 'error')!.message)}`
       : '<span class="privacy-icon">●</span> Parsed locally. Nothing is uploaded.';
+  root.querySelector('#editor-version')!.textContent =
+    activeVersion === 'base' ? 'BASE · READ ONLY' : 'PROPOSED WORKFLOW';
+  root.querySelector<HTMLElement>('.pane-hint')!.textContent =
+    activeVersion === 'base' ? 'COMPARISON SOURCE' : 'EDIT TO PREVIEW';
   renderEvents();
   renderGraph();
   renderDiagnostics();
   if (selectedJob && parsed.jobs.some((job) => job.id === selectedJob))
     renderInspector(selectedJob);
+}
+
+function renderComparison() {
+  const bar = root.querySelector<HTMLDivElement>('#compare-bar')!;
+  bar.hidden = !baseWorkflow;
+  root.querySelector<HTMLElement>('#diff-legend')!.hidden = !baseWorkflow;
+  if (!baseWorkflow) return;
+  const counts = { added: 0, changed: 0, removed: 0 };
+  for (const change of jobChanges.values()) {
+    if (change !== 'unchanged') counts[change] += 1;
+  }
+  root.querySelector('#compare-summary')!.textContent =
+    `${counts.added} added · ${counts.changed} changed · ${counts.removed} removed`;
+  const baseButton = root.querySelector<HTMLButtonElement>('#show-base')!;
+  const currentButton = root.querySelector<HTMLButtonElement>('#show-current')!;
+  baseButton.textContent = `Base · ${baseFile}`;
+  currentButton.textContent = `Proposed · ${proposedFile}`;
+  baseButton.setAttribute('aria-pressed', String(activeVersion === 'base'));
+  currentButton.setAttribute('aria-pressed', String(activeVersion === 'proposed'));
+}
+
+function showVersion(version: WorkflowVersion) {
+  if (!baseWorkflow || version === activeVersion) return;
+  activeVersion = version;
+  const text = version === 'base' ? baseText : proposedText;
+  activeFile = version === 'base' ? baseFile : proposedFile;
+  input.value = text;
+  input.readOnly = version === 'base';
+  root.querySelector('#filename')!.textContent = activeFile;
+  selectedJob = undefined;
+  update();
 }
 
 function jumpToLine(line: number) {
@@ -511,6 +586,30 @@ root
     await loadWorkflowFile(file);
     (event.target as HTMLInputElement).value = '';
   });
+root
+  .querySelector<HTMLInputElement>('#compare-input')!
+  .addEventListener('change', async (event) => {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    await loadWorkflowFile(file, 'base');
+    (event.target as HTMLInputElement).value = '';
+  });
+root.querySelector('#show-base')!.addEventListener('click', () => showVersion('base'));
+root
+  .querySelector('#show-current')!
+  .addEventListener('click', () => showVersion('proposed'));
+root.querySelector('#clear-compare')!.addEventListener('click', () => {
+  baseWorkflow = undefined;
+  baseText = '';
+  baseFile = '';
+  activeVersion = 'proposed';
+  input.readOnly = false;
+  input.value = proposedText;
+  activeFile = proposedFile;
+  root.querySelector('#filename')!.textContent = activeFile;
+  selectedJob = undefined;
+  update();
+});
 root.querySelector('#share-button')!.addEventListener('click', async () => {
   let encoded: string;
   try {
@@ -558,7 +657,9 @@ const hashMatch = location.hash.match(/workflow=([^&]+)/);
 if (hashMatch) {
   try {
     input.value = decodeWorkflow(hashMatch[1]!);
-    activeFile = 'shared-workflow.yml';
+    proposedText = input.value;
+    proposedFile = 'shared-workflow.yml';
+    activeFile = proposedFile;
     root.querySelector('#filename')!.textContent = activeFile;
   } catch {
     notify('This workflow link is invalid. Showing the example instead.');
