@@ -9,6 +9,15 @@ export type Diagnostic = {
   jobId?: string;
 };
 export type Step = { name: string; line: number; uses?: string; run?: string };
+export type MatrixInfo = {
+  axes: { name: string; values: string[] }[];
+  combinations: Record<string, string>[];
+  baseCount: number;
+  truncated: boolean;
+  dynamic: boolean;
+  include: boolean;
+  exclude: boolean;
+};
 export type Job = {
   id: string;
   name: string;
@@ -17,7 +26,7 @@ export type Job = {
   steps: Step[];
   condition?: string;
   runsOn?: string;
-  strategy?: string;
+  strategy?: MatrixInfo;
   permissions?: string;
 };
 export type Workflow = {
@@ -59,6 +68,70 @@ function readEvents(node: Node | null | undefined): string[] {
       .filter((value): value is string => Boolean(value));
   const value = scalar(node);
   return value ? [value] : [];
+}
+
+function readMatrix(strategyNode: Node | null | undefined): MatrixInfo | undefined {
+  const strategy = asObject(strategyNode);
+  const matrixNode = strategy?.get('matrix');
+  const matrix = asObject(matrixNode);
+  if (!matrix) return undefined;
+  const includeNode = matrix.get('include');
+
+  const axes = [...matrix]
+    .filter(([name, node]) => name !== 'include' && name !== 'exclude' && isSeq(node))
+    .map(([name, node]) => ({
+      name: String(name),
+      values: (node as Node & { items: Node[] }).items
+        .map((item) => scalar(item))
+        .filter((value): value is string => value !== undefined),
+    }))
+    .filter((axis) => axis.values.length > 0);
+  let combinations: Record<string, string>[] = axes.length ? [{}] : [];
+  const baseCount = axes.reduce(
+    (count, axis) => Math.min(count * axis.values.length, 129),
+    axes.length ? 1 : 0,
+  );
+  const truncated = baseCount > 128;
+  for (const axis of axes) {
+    const next: Record<string, string>[] = [];
+    for (const combination of combinations) {
+      for (const value of axis.values) {
+        next.push({ ...combination, [axis.name]: value });
+        if (next.length >= 128) break;
+      }
+      if (next.length >= 128) break;
+    }
+    combinations = next.slice(0, 128);
+  }
+
+  const exclusions = isSeq(matrix.get('exclude'))
+    ? (matrix.get('exclude') as Node & { items: Node[] }).items.flatMap((item) => {
+        const object = asObject(item);
+        if (!object) return [];
+        const entries = [...object].flatMap(([key, value]) => {
+          const itemValue = scalar(value);
+          return itemValue === undefined ? [] : [[String(key), itemValue]];
+        });
+        if (!entries.length) return [];
+        return [Object.fromEntries(entries)];
+      })
+    : [];
+  combinations = combinations.filter(
+    (combination) =>
+      !exclusions.some((excluded) =>
+        Object.entries(excluded).every(([key, value]) => combination[key] === value),
+      ),
+  );
+
+  return {
+    axes,
+    combinations,
+    baseCount,
+    truncated,
+    dynamic: axes.some((axis) => axis.values.some((value) => value.includes('${{'))),
+    include: isSeq(includeNode) && includeNode.items.length > 0,
+    exclude: exclusions.length > 0,
+  };
 }
 
 export function parseWorkflow(raw: string): Workflow {
@@ -180,9 +253,7 @@ export function parseWorkflow(raw: string): Workflow {
       steps,
       condition: scalar(map.get('if') as Node),
       runsOn: scalar(map.get('runs-on') as Node),
-      strategy: asObject(map.get('strategy') as Node)?.has('matrix')
-        ? 'matrix'
-        : undefined,
+      strategy: readMatrix(map.get('strategy') as Node),
       permissions: scalar(map.get('permissions') as Node),
     });
   }

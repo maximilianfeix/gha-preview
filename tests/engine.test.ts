@@ -54,6 +54,57 @@ describe('parseWorkflow', () => {
     expect(() => parseWorkflow('jobs:\n  : [')).not.toThrow();
   });
 
+  it('previews matrix products and applies simple exclusions', () => {
+    const parsed = parseWorkflow(`on: push
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: [20, 22]
+        exclude:
+          - os: windows-latest
+            node: 20
+        include:
+          - os: macos-latest
+            node: 22
+`);
+    expect(parsed.jobs[0]?.strategy).toMatchObject({
+      baseCount: 4,
+      exclude: true,
+      include: true,
+      combinations: [
+        { os: 'ubuntu-latest', node: '20' },
+        { os: 'ubuntu-latest', node: '22' },
+        { os: 'windows-latest', node: '22' },
+      ],
+    });
+  });
+
+  it('caps large matrix previews and keeps expression values unresolved', () => {
+    const values = Array.from({ length: 13 }, (_, index) => `v${index}`).join(', ');
+    const parsed = parseWorkflow(
+      `on: push\njobs:\n  test:\n    strategy:\n      matrix:\n        os: [${values}]\n        node: [${values}]\n        dynamic: ["\${{ fromJSON(vars.VERSIONS) }}"]\n`,
+    );
+    expect(parsed.jobs[0]?.strategy).toMatchObject({
+      baseCount: 129,
+      truncated: true,
+      dynamic: true,
+    });
+    expect(parsed.jobs[0]?.strategy?.combinations.length).toBeLessThanOrEqual(128);
+  });
+
+  it('labels include-only matrices without inventing combinations', () => {
+    const parsed = parseWorkflow(
+      `on: push\njobs:\n  test:\n    strategy:\n      matrix:\n        include:\n          - os: ubuntu-latest\n            node: 22\n`,
+    );
+    expect(parsed.jobs[0]?.strategy).toMatchObject({
+      axes: [],
+      combinations: [],
+      include: true,
+    });
+  });
+
   it('records trigger filters that need branch or path context', () => {
     const parsed = parseWorkflow(
       'on:\n  push:\n    branches: [main]\n  workflow_dispatch:\n    inputs:\n      target:\n        required: true\njobs:\n  build:\n    runs-on: ubuntu-latest\n',

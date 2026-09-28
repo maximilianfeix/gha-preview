@@ -25,7 +25,7 @@
 
 1. [Open the live preview](https://maximilianfeix.github.io/gha-preview/).
 2. Select `push` to see the release job become eligible; choose `pull_request` to see it skipped.
-3. Click **Build package** to inspect its dependencies and jump to its YAML source.
+3. Click **Test suite** to inspect its three matrix combinations, then jump to its YAML source.
 
 ## Why gha-preview?
 
@@ -44,6 +44,7 @@ tests ─────┘
 - **Shows the job graph.** Follow `needs:` links, identify entry points, and spot missing jobs or dependency cycles.
 - **Navigates large maps.** Zoom with the graph controls or `Ctrl` + scroll; drag empty space to pan, or scroll and swipe on touchscreens.
 - **Previews common events.** Select a declared trigger to see which jobs are eligible, skipped by a simple event condition, or need runtime context.
+- **Opens matrix jobs.** Inspect axis values and up to 128 combinations, with simple `exclude` entries applied. Dynamic expressions stay literal; `include` overlays are called out instead of guessed.
 - **Links the map to the source.** Select a job, step, or diagnostic to jump to its YAML line.
 - **Exports a clean SVG.** Save the current dependency map for a pull request, issue, or README.
 - **Shares a reproducible example.** Copy a URL with compressed YAML in the URL fragment. The workflow is not sent to the site server, but anyone with the link can read it.
@@ -56,7 +57,7 @@ Workflow files and share links are limited to 1 MB. Remove secrets before copyin
 
 gha-preview is a static preview, not a GitHub runner. It understands workflow triggers, job dependencies, basic `if` checks against `github.event_name`, job names, runners, steps, and matrix presence. Conditions that depend on expressions, secrets, job results, or other runtime data are labelled **Needs context** instead of guessed. Branch, path, tag, and activity-type filters are not evaluated, so jobs stay unresolved when a selected event uses one. A job marked **Eligible** could still be skipped or fail when GitHub evaluates the complete workflow.
 
-It does not validate every part of the GitHub Actions expression language, start containers, expand every matrix combination, or execute shell commands. Use [actionlint](https://github.com/rhysd/actionlint) and a real GitHub Actions run for validation and execution.
+It does not validate every part of the GitHub Actions expression language, start containers, execute matrix jobs or shell commands, or apply `include` overlays to matrix combinations. Large matrix previews are capped at 128 combinations. Use [actionlint](https://github.com/rhysd/actionlint) and a real GitHub Actions run for validation and execution.
 
 ## Quick start
 
@@ -108,7 +109,7 @@ Bug reports and focused pull requests are welcome. Please redact secrets from sa
 - [x] Click-through source locations, diagnostics, SVG export, and compressed share links
 - [x] Conservative preview for common workflow events
 - [x] Zoom and pan large workflow graphs
-- [ ] Expand matrix combinations in the job map
+- [x] Preview matrix combinations and exclusions
 - [ ] More expression helpers, with explicit unknown states for runtime-only values
 - [ ] Visual diff between two workflow revisions
 
