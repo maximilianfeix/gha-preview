@@ -13,16 +13,30 @@ const sample = `name: Release gate
 on: [pull_request, push]
 jobs:
   lint:
-    name: Lint & typecheck
+    name: Format check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: npm ci && npm run lint
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
   test:
     name: Test suite
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: [22, 24]
+    runs-on: \${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: \${{ matrix.node }}
+          cache: npm
+      - run: npm ci
       - run: npm test
   build:
     name: Build package
@@ -30,16 +44,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
       - run: npm run build
   publish:
     name: Publish release
     needs: build
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - run: npm publish`;
+      - run: echo "Ready to release on push"`;
 
 const icon = (name: string) => {
   const paths: Record<string, string> = {
