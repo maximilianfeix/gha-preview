@@ -26,7 +26,7 @@
 
 1. [Open the live preview](https://maximilianfeix.github.io/gha-preview/).
 2. Select `push` to see the release job become eligible; choose `pull_request` to see it skipped.
-3. Click **Test suite** to inspect its three matrix combinations, then jump to its YAML source.
+3. Click **Test suite** to inspect its four matrix combinations, then jump to its YAML source.
 
 ## Why gha-preview?
 
