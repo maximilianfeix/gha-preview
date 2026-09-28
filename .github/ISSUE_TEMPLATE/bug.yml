@@ -1,0 +1,28 @@
+name: Bug report
+description: Report something that does not work as expected.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Please include a small workflow example with secrets removed.
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+      description: What should the preview have shown?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened?
+      description: What did it show instead? Add your browser and OS.
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: Minimal workflow (redacted)
+      render: yaml
+    validations:
+      required: false

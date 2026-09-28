@@ -1,0 +1,23 @@
+name: Feature idea
+description: Suggest an improvement to the workflow preview.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to understand or do?
+      description: Describe the workflow problem in your own words.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: What would a useful preview look like?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What have you tried so far?
+    validations:
+      required: false
