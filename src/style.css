@@ -538,6 +538,39 @@ p {
   color: #677468;
   font: 9px var(--mono);
 }
+.graph-controls {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.zoom-button {
+  width: 23px;
+  height: 23px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #e3e9e2;
+  border-radius: 5px;
+  background: #fff;
+  color: #58665a;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.zoom-button:hover {
+  border-color: #b6c7b6;
+  color: #31764e;
+}
+.zoom-button:focus-visible,
+.quiet-button:focus-visible {
+  outline: 2px solid #438154;
+  outline-offset: 2px;
+}
+.zoom-level {
+  width: 32px;
+  color: #7b857b;
+  font: 9px var(--mono);
+  text-align: center;
+}
 .quiet-button {
   padding: 4px 8px;
   border: 0;
@@ -554,8 +587,15 @@ p {
   min-height: 300px;
   max-height: 340px;
   overflow: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-x pan-y;
   scrollbar-width: thin;
   scrollbar-color: #c8d0c7 transparent;
+  cursor: grab;
+}
+.graph-scroll.is-panning {
+  cursor: grabbing;
+  user-select: none;
 }
 .graph-canvas {
   min-width: 100%;
@@ -566,6 +606,9 @@ p {
 .workflow-svg {
   max-width: none;
   overflow: visible;
+  transition:
+    width 120ms ease-out,
+    height 120ms ease-out;
 }
 .edge {
   fill: none;
@@ -1601,6 +1644,9 @@ p {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+  .workflow-svg {
+    transition: none;
   }
 }
 .scenario-caveat {

@@ -42,6 +42,7 @@ tests ─────┘
 ## What it does
 
 - **Shows the job graph.** Follow `needs:` links, identify entry points, and spot missing jobs or dependency cycles.
+- **Navigates large maps.** Zoom with the graph controls or `Ctrl` + scroll; drag empty space to pan, or scroll and swipe on touchscreens.
 - **Previews common events.** Select a declared trigger to see which jobs are eligible, skipped by a simple event condition, or need runtime context.
 - **Links the map to the source.** Select a job, step, or diagnostic to jump to its YAML line.
 - **Exports a clean SVG.** Save the current dependency map for a pull request, issue, or README.
@@ -106,7 +107,8 @@ Bug reports and focused pull requests are welcome. Please redact secrets from sa
 - [x] Browser-only YAML editor and interactive job graph
 - [x] Click-through source locations, diagnostics, SVG export, and compressed share links
 - [x] Conservative preview for common workflow events
-- [ ] Better readability for large workflows: zoom, pan, and matrix expansion
+- [x] Zoom and pan large workflow graphs
+- [ ] Expand matrix combinations in the job map
 - [ ] More expression helpers, with explicit unknown states for runtime-only values
 - [ ] Visual diff between two workflow revisions
 
