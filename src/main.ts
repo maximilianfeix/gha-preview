@@ -218,9 +218,11 @@ function svgGraph(workflow: Workflow): string {
       const status = statusFor(job.id);
       const conditional = Boolean(job.condition);
       const matrixLabel = job.strategy
-        ? job.strategy.axes.length
-          ? ` · matrix ×${job.strategy.truncated ? '128+' : job.strategy.combinations.length}`
-          : ' · matrix · include only'
+        ? job.strategy.dynamic
+          ? ' · matrix · dynamic'
+          : job.strategy.axes.length
+            ? ` · matrix ×${job.strategy.truncated ? '128+' : job.strategy.combinations.length}`
+            : ' · matrix · include only'
         : '';
       const label = job.name.length > 22 ? `${job.name.slice(0, 20)}…` : job.name;
       return `<g class="job-node state-${status} ${conditional ? 'has-condition' : ''} ${selectedJob === job.id ? 'is-selected' : ''}" transform="translate(${position.x} ${position.y})" data-job="${escapeHtml(job.id)}" tabindex="0" role="button" aria-label="${escapeHtml(job.name)}, ${stateLabel[status]}${matrixLabel}, line ${job.line}"><rect class="node-shell" x="0" y="0" width="176" height="96" rx="12"/><rect class="node-top-line" x="1" y="1" width="174" height="3" rx="2"/><circle class="node-state" cx="19" cy="23" r="5"/><text class="node-label" x="34" y="27">${escapeHtml(label)}</text><text class="node-id" x="16" y="52">${escapeHtml(job.id)}${matrixLabel}</text><line class="node-divider" x1="16" y1="64" x2="160" y2="64"/><text class="node-meta" x="16" y="82">${job.needs.length ? `${job.needs.length} ${job.needs.length === 1 ? 'dependency' : 'dependencies'}` : 'entry point'}</text><text class="node-status" x="160" y="82" text-anchor="end">${stateSymbol[status]} ${stateLabel[status]}</text><title>${escapeHtml(job.name)} · line ${job.line}${job.condition ? ` · if: ${escapeHtml(job.condition)}` : ''}${matrixLabel}</title></g>`;
@@ -238,11 +240,13 @@ function renderInspector(jobId: string) {
   inspector.hidden = false;
   const matrix = job.strategy;
   const matrixCount = matrix
-    ? matrix.axes.length
-      ? `${matrix.truncated ? '128+' : matrix.combinations.length} combinations`
-      : matrix.include
-        ? 'include-only matrix'
-        : 'matrix values need context'
+    ? matrix.dynamic
+      ? 'dynamic axis values'
+      : matrix.axes.length
+        ? `${matrix.truncated ? '128+' : matrix.combinations.length} combinations`
+        : matrix.include
+          ? 'include-only matrix'
+          : 'matrix values need context'
     : '';
   const matrixPanel = matrix
     ? `<div class="inspector-matrix"><div class="matrix-title"><span>MATRIX PREVIEW</span><strong>${matrixCount}</strong></div><div class="matrix-axes">${matrix.axes.map((axis) => `<span><code>${escapeHtml(axis.name)}</code><span>${axis.values.map(escapeHtml).join(' · ')}</span></span>`).join('') || '<span>Combination values come from include entries.</span>'}</div><div class="matrix-variants">${matrix.combinations
