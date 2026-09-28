@@ -93,7 +93,7 @@ root.innerHTML = `
       <div class="workbench">
         <div class="workbench-bar"><div class="bar-file"><span class="file-icon">Y</span><span id="filename">release.yml</span><span class="bar-path">.github / workflows</span></div><div class="bar-actions"><label class="file-button" for="file-input">${icon('upload')}<span>Open file</span></label><input id="file-input" type="file" accept=".yml,.yaml,text/yaml" hidden/><button id="share-button" class="icon-button" title="Copy a link to this workflow">${icon('share')}<span class="mobile-hide"> Share</span></button><button id="export-button" class="icon-button" title="Download the job graph as SVG">${icon('download')}<span class="mobile-hide"> SVG</span></button></div></div>
         <div class="workbench-body"><section class="editor-pane" aria-label="Workflow editor"><div class="pane-heading"><div><span class="pane-dot"></span> workflow.yml</div><span class="pane-hint">EDIT TO PREVIEW</span></div><div class="editor-wrap"><div id="line-numbers" class="line-numbers" aria-hidden="true"></div><textarea id="yaml-input" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="GitHub Actions workflow YAML" wrap="off"></textarea></div><div id="editor-message" class="editor-message"><span class="privacy-icon">●</span> Parsed locally. Nothing is uploaded.</div></section>
-          <section class="graph-pane" aria-label="Interactive workflow graph"><div class="pane-heading graph-heading"><div><span class="graph-heading-mark">${icon('code')}</span> Job map <span id="job-count" class="count-pill">—</span></div><button id="fit-button" class="quiet-button" title="Fit graph to view">Fit view</button></div><div id="graph-scroll" class="graph-scroll"><div id="graph" class="graph-canvas"></div></div><div class="graph-footer"><span><i class="legend-dot success"></i>Eligible</span><span><i class="legend-dot conditional"></i>Conditional</span><span><i class="legend-dot unknown"></i>Unknown</span><span class="graph-hint">Click a job to inspect its source</span></div></section>
+          <section class="graph-pane" aria-label="Interactive workflow graph"><div class="pane-heading graph-heading"><div><span class="graph-heading-mark">${icon('code')}</span> Job map <span id="job-count" class="count-pill">—</span></div><div class="graph-controls" aria-label="Graph view controls"><button id="zoom-out" class="zoom-button" aria-label="Zoom out" title="Zoom out">−</button><output id="zoom-level" class="zoom-level" aria-live="polite">100%</output><button id="zoom-in" class="zoom-button" aria-label="Zoom in" title="Zoom in">+</button><button id="fit-button" class="quiet-button" title="Reset zoom and center the graph">Reset</button></div></div><div id="graph-scroll" class="graph-scroll"><div id="graph" class="graph-canvas"></div></div><div class="graph-footer"><span><i class="legend-dot success"></i>Eligible</span><span><i class="legend-dot conditional"></i>Conditional</span><span><i class="legend-dot unknown"></i>Unknown</span><span class="graph-hint">Scroll to pan · Ctrl + wheel to zoom</span></div></section>
         </div>
         <div class="scenario-bar"><div class="scenario-intro">${icon('play')}<span><strong>Try a scenario</strong><small>See what this event would start</small></span></div><div id="event-picker" class="event-picker"></div><span class="scenario-caveat">Event filters need context</span><button id="reset-scenario" class="reset-button">Reset</button></div>
         <div id="inspector" class="inspector" hidden></div>
@@ -114,6 +114,8 @@ const diagnostics = root.querySelector<HTMLDivElement>('#diagnostics')!;
 const eventPicker = root.querySelector<HTMLDivElement>('#event-picker')!;
 const inspector = root.querySelector<HTMLDivElement>('#inspector')!;
 const toast = root.querySelector<HTMLDivElement>('#toast')!;
+const graphViewport = root.querySelector<HTMLDivElement>('#graph-scroll')!;
+let graphZoom = 1;
 let parsed: Workflow;
 let selectedJob: string | undefined;
 let selectedEvent = '';
@@ -251,7 +253,12 @@ function renderInspector(jobId: string) {
 }
 
 function renderGraph() {
+  const previousScrollLeft = graphViewport.scrollLeft;
+  const previousScrollTop = graphViewport.scrollTop;
   graph.innerHTML = svgGraph(parsed);
+  applyGraphZoom();
+  graphViewport.scrollLeft = previousScrollLeft;
+  graphViewport.scrollTop = previousScrollTop;
   graph.querySelectorAll<SVGGElement>('.job-node').forEach((node) => {
     const open = () => {
       selectedJob = node.dataset.job;
@@ -267,6 +274,29 @@ function renderGraph() {
     });
   });
   root.querySelector('#job-count')!.textContent = String(parsed.jobs.length);
+}
+
+function applyGraphZoom() {
+  const svg = graph.querySelector<SVGSVGElement>('.workflow-svg');
+  const output = root.querySelector<HTMLOutputElement>('#zoom-level')!;
+  output.value = `${Math.round(graphZoom * 100)}%`;
+  output.textContent = output.value;
+  if (!svg) return;
+  const width = Number(svg.getAttribute('width'));
+  const height = Number(svg.getAttribute('height'));
+  svg.style.width = `${width * graphZoom}px`;
+  svg.style.height = `${height * graphZoom}px`;
+}
+
+function setGraphZoom(next: number) {
+  const previous = graphZoom;
+  graphZoom = Math.max(0.5, Math.min(2, Math.round(next * 10) / 10));
+  if (graphZoom === previous) return;
+  const focusX = (graphViewport.scrollLeft + graphViewport.clientWidth / 2) / previous;
+  const focusY = (graphViewport.scrollTop + graphViewport.clientHeight / 2) / previous;
+  applyGraphZoom();
+  graphViewport.scrollLeft = focusX * graphZoom - graphViewport.clientWidth / 2;
+  graphViewport.scrollTop = focusY * graphZoom - graphViewport.clientHeight / 2;
 }
 
 function renderEvents() {
@@ -370,9 +400,54 @@ root.querySelector('#reset-scenario')!.addEventListener('click', () => {
   selectedEvent = '';
   update();
 });
+root
+  .querySelector('#zoom-in')!
+  .addEventListener('click', () => setGraphZoom(graphZoom + 0.1));
+root
+  .querySelector('#zoom-out')!
+  .addEventListener('click', () => setGraphZoom(graphZoom - 0.1));
 root.querySelector('#fit-button')!.addEventListener('click', () => {
-  root.querySelector('#graph-scroll')!.scrollTo({ left: 0, top: 0, behavior: 'smooth' });
+  graphZoom = 1;
+  applyGraphZoom();
+  graphViewport.scrollTo({ left: 0, top: 0, behavior: 'smooth' });
 });
+graphViewport.addEventListener(
+  'wheel',
+  (event) => {
+    if (!event.ctrlKey) return;
+    event.preventDefault();
+    setGraphZoom(graphZoom + (event.deltaY < 0 ? 0.1 : -0.1));
+  },
+  { passive: false },
+);
+let panStart: { x: number; y: number; left: number; top: number } | undefined;
+graphViewport.addEventListener('pointerdown', (event) => {
+  if (event.pointerType !== 'mouse' || event.button !== 0) return;
+  if (event.target instanceof Element && event.target.closest('.job-node')) return;
+  panStart = {
+    x: event.clientX,
+    y: event.clientY,
+    left: graphViewport.scrollLeft,
+    top: graphViewport.scrollTop,
+  };
+  graphViewport.setPointerCapture(event.pointerId);
+  graphViewport.classList.add('is-panning');
+});
+graphViewport.addEventListener('pointermove', (event) => {
+  if (!panStart) return;
+  graphViewport.scrollLeft = panStart.left - (event.clientX - panStart.x);
+  graphViewport.scrollTop = panStart.top - (event.clientY - panStart.y);
+});
+function endPan(event: PointerEvent) {
+  if (!panStart) return;
+  panStart = undefined;
+  graphViewport.classList.remove('is-panning');
+  if (graphViewport.hasPointerCapture(event.pointerId)) {
+    graphViewport.releasePointerCapture(event.pointerId);
+  }
+}
+graphViewport.addEventListener('pointerup', endPan);
+graphViewport.addEventListener('pointercancel', endPan);
 root
   .querySelector<HTMLInputElement>('#file-input')!
   .addEventListener('change', async (event) => {
