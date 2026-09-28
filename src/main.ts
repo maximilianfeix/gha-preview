@@ -248,8 +248,18 @@ function renderInspector(jobId: string) {
           ? 'include-only matrix'
           : 'matrix values need context'
     : '';
+  const matrixAxisDescription = matrix?.axes.length
+    ? matrix.axes
+        .map(
+          (axis) =>
+            `<span><code>${escapeHtml(axis.name)}</code><span>${axis.values.map(escapeHtml).join(' · ')}</span></span>`,
+        )
+        .join('')
+    : matrix?.include
+      ? '<span>Combination values come from include entries.</span>'
+      : '<span>No static matrix axis values to preview.</span>';
   const matrixPanel = matrix
-    ? `<div class="inspector-matrix"><div class="matrix-title"><span>MATRIX PREVIEW</span><strong>${matrixCount}</strong></div><div class="matrix-axes">${matrix.axes.map((axis) => `<span><code>${escapeHtml(axis.name)}</code><span>${axis.values.map(escapeHtml).join(' · ')}</span></span>`).join('') || '<span>Combination values come from include entries.</span>'}</div><div class="matrix-variants">${matrix.combinations
+    ? `<div class="inspector-matrix"><div class="matrix-title"><span>MATRIX PREVIEW</span><strong>${matrixCount}</strong></div><div class="matrix-axes">${matrixAxisDescription}</div><div class="matrix-variants">${matrix.combinations
         .slice(0, 12)
         .map(
           (combination) =>
