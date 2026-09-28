@@ -520,6 +520,10 @@ const exportedSvgStyle = `
   .node-divider{stroke:#e9ede8}.node-meta{fill:#89938a;font:8px monospace}
   .node-status{fill:#36784d;font:8px monospace}.state-skipped .node-status{fill:#89928a}
   .state-unknown .node-status{fill:#7588a1}
+  .diff-added .node-shell{stroke:#54a06a;stroke-width:2}.diff-added .node-top-line{fill:#54a06a}
+  .diff-changed .node-shell{stroke:#d2a34d;stroke-width:2}.diff-changed .node-top-line{fill:#d2a34d}
+  .diff-removed .node-shell{stroke:#cb765f;stroke-width:2;stroke-dasharray:5 3}
+  .diff-removed .node-top-line,.diff-removed .node-state{fill:#cb765f}
 `;
 input.value = sample;
 input.addEventListener('input', update);
